@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="student-.css">
+</head>
+
+<body>
+    <header>
+        <div class="profile-icon">
+            <button class="dropbtn">
+                <a id="firstNameInitial"></a> <a id="firstName"></a>
+            </button>
+            <div class="dropdown-content">
+                <a href="sign-in.html" id="signOutButton">
+                    Sign Out <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+        </div>   
+        
+        <div class="heading">
+            <h2>Your Dashboard</h2>
+        </div>
+
+        <div class="image">
+            <a href="learn-more.html">
+            <img src="prolerus logo it6.png" alt="Logo" width="90" height="90" />
+            </a>
+        </div>
+        
+    </header>
+
+    <!-- Search Bar outside the video card -->
+    <div>
+        <input type="text" id="searchInput" placeholder="Search for videos..." />
+    </div>
+
+    <div class="video-card" id="videoCard" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;">
+        <!-- Videos will be displayed here -->
+    </div>
+    <div id="videoErrorMessage" class="error-message"></div>
+    
+    <button class="upload" onclick="location.href='upload-.html'">
+        <i class="fas fa-upload"></i> Upload
+    </button>
+    
+    <script>
+        function toggleDropdown(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.matches('.profile-icon') && !event.target.matches('#firstName')) {
+                const dropdowns = document.getElementsByClassName("dropdown-content");
+                for (let i = 0; i < dropdowns.length; i++) {
+                    dropdowns[i].style.display = "none";
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const email = sessionStorage.getItem('userEmail');
+            console.log('User Email:', email); // Debugging line
+            if (!email) {
+                document.getElementById('videoErrorMessage').innerText = 'User not authenticated';
+                return;
+            }
+
+            // Fetch user details based on email
+            fetch(`/user-info?email=${encodeURIComponent(email)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(user => {
+                    const firstName = user.firstName; // Assuming the response contains the firstName
+                    console.log('First Name:', firstName); // Debugging line
+                    if (firstName) {
+                        document.getElementById('firstNameInitial').innerText = firstName.charAt(0).toUpperCase();
+                        document.getElementById('firstName').innerText = `Welcome ${firstName}`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching user details:', error);
+                    document.getElementById('videoErrorMessage').innerText = 'Failed to load user details.';
+                });
+
+            // Fetch videos
+            fetch(`/videos?email=${encodeURIComponent(email)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(videos => {
+                    const videoCard = document.getElementById('videoCard');
+                    videoCard.innerHTML = ''; // Clear previous videos
+                    console.log('Fetched videos:', videos); // Log the fetched videos
+                    videos.reverse(); // Reverse the order of videos
+                    videos.forEach(video => {
+                        const videoItem = document.createElement('div');
+                        videoItem.className = 'video-item'; // Add class for styling
+
+                        const videoPlayer = document.createElement('video');
+                        videoPlayer.controls = true;
+                        const videoId = video._id; // Store the video ID for logging
+                        videoPlayer.src = `/videos.files/${videoId}`; // Set the video source
+                        videoPlayer.type = video.metadata.contentType; // Set the content type
+
+                        // Add title and subject
+                        const title = document.createElement('h3');
+                        title.className = 'video-title';
+                        title.innerText = video.metadata.title; // Access title from metadata
+
+                        const subject = document.createElement('p');
+                        subject.className = 'video-subject';
+                        subject.innerText = video.metadata.subject; // Access subject from metadata
+
+                        // Add delete button
+                        const deleteButton = document.createElement('button');
+                        deleteButton.className = 'delete-button';
+                        deleteButton.innerText = 'Delete';
+                        deleteButton.onclick = () => deleteVideo(videoId); // Call delete function
+
+                        // Append elements to video item
+                        videoItem.appendChild(videoPlayer);
+                        videoItem.appendChild(title);
+                        videoItem.appendChild(subject);
+                        videoItem.appendChild(deleteButton);
+
+                        // Append video item to video card
+                        videoCard.appendChild(videoItem);
+                        videoPlayer.load(); // Load the video player
+                    });
+
+                    // Search functionality
+                    const searchInput = document.getElementById('searchInput');
+                    searchInput.addEventListener('input', () => {
+                        const searchTerm = searchInput.value.toLowerCase();
+                        const filteredVideos = videos.filter(video => 
+                            video.metadata.title.toLowerCase().includes(searchTerm) || 
+                            video.metadata.subject.toLowerCase().includes(searchTerm)
+                        );
+                        videoCard.innerHTML = ''; // Clear previous videos
+                        filteredVideos.reverse(); // Reverse the order of filtered videos
+                        filteredVideos.forEach(video => {
+                            const videoItem = document.createElement('div');
+                            videoItem.className = 'video-item'; // Add class for styling
+
+                            const videoPlayer = document.createElement('video');
+                            videoPlayer.controls = true;
+                            const videoId = video._id; // Store the video ID for logging
+                            videoPlayer.src = `/videos.files/${videoId}`; // Set the video source
+                            videoPlayer.type = video.metadata.contentType; // Set the content type
+
+                            // Add title and subject
+                            const title = document.createElement('h3');
+                            title.className = 'video-title';
+                            title.innerText = video.metadata.title; // Access title from metadata
+
+                            const subject = document.createElement('p');
+                            subject.className = 'video-subject';
+                            subject.innerText = video.metadata.subject; // Access subject from metadata
+
+                            // Add delete button
+                            const deleteButton = document.createElement('button');
+                            deleteButton.className = 'delete-button';
+                            deleteButton.innerText = 'Delete';
+                            deleteButton.onclick = () => deleteVideo(videoId); // Call delete function
+
+                            // Append elements to video item
+                            videoItem.appendChild(videoPlayer);
+                            videoItem.appendChild(title);
+                            videoItem.appendChild(subject);
+                            videoItem.appendChild(deleteButton);
+
+                            // Append video item to video card
+                            videoCard.appendChild(videoItem);
+                            videoPlayer.load(); // Load the video player
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching videos:', error);
+                    document.getElementById('videoErrorMessage').innerText = 'Failed to load videos.';
+                });
+        });
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
+</create_file>

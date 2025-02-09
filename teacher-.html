@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="teacher-.css">
+</head>
+<body>
+    <header>
+        <div class="profile-icon">
+            <button class="dropbtn">
+                <a id="firstNameInitial"></a> <a id="firstName"></a>
+            </button>
+            <div class="dropdown-content">
+                <a href="sign-in.html" id="signOutButton">
+                    Sign Out <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+        </div>   
+        
+        <div class="heading">
+            <h2>Your Dashboard</h2>
+        </div>
+
+        <div class="image">
+            <a href="learn-more.html">
+            <img src="prolerus logo it6.png" alt="Logo" width="90" height="90" />
+            </a>
+        </div>
+    </header>
+
+    <!-- Search Bar outside the video card -->
+    <div>
+        <input type="text" id="searchInput" placeholder="Search for videos..." />
+    </div>
+
+    <div class="video-card" id="videoCard" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;">
+        <!-- Videos will be displayed here -->
+    </div>
+    <div id="videoErrorMessage" class="error-message"></div>
+    <script>
+        function toggleDropdown(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.matches('.profile-icon')) {
+                const dropdowns = document.getElementsByClassName("dropdown-content");
+                for (let i = 0; i < dropdowns.length; i++) {
+                    dropdowns[i].style.display = "none";
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const email = sessionStorage.getItem('userEmail');
+            console.log('User Email:', email); // Debugging line
+            if (!email) {
+                document.getElementById('videoErrorMessage').innerText = 'User not authenticated';
+                return;
+            }
+
+            // Fetch user details based on email
+            fetch(`/user-info?email=${encodeURIComponent(email)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(user => {
+                    const firstName = user.firstName; // Assuming the response contains the firstName
+                    console.log('First Name:', firstName); // Debugging line
+                    if (firstName) {
+                        document.getElementById('firstNameInitial').innerText = firstName.charAt(0).toUpperCase();
+                        document.getElementById('firstName').innerText = `Welcome ${firstName}`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching user details:', error);
+                    document.getElementById('videoErrorMessage').innerText = 'Failed to load user details.';
+                });
+
+            // Fetch videos
+            fetch(`/videos?email=${encodeURIComponent(email)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(videos => {
+                    const videoCard = document.getElementById('videoCard');
+                    videoCard.innerHTML = ''; // Clear previous videos
+                    console.log('Fetched videos:', videos); // Log the fetched videos
+                    videos.reverse(); // Reverse the order of videos
+                    videos.forEach(video => {
+                        const videoItem = document.createElement('div');
+                        videoItem.className = 'video-item'; // Add class for styling
+
+                        const videoPlayer = document.createElement('video');
+                        videoPlayer.controls = true;
+                        const videoId = video._id; // Store the video ID for logging
+                        videoPlayer.src = `/videos.files/${videoId}`; // Set the video source
+                        videoPlayer.type = video.metadata.contentType; // Set the content type
+
+                        // Add subject
+                        const subject = document.createElement('h3');
+                        subject.className = 'video-subject';
+                        subject.innerText = video.metadata.subject; // Access subject from metadata
+
+                        // Add email
+                        const emailDisplay = document.createElement('p');
+                        emailDisplay.className = 'video-email';
+                        emailDisplay.innerText = video.metadata.userEmail; // Access email from metadata
+
+                        // Add blue icon for unviewed videos
+                        const blueIcon = document.createElement('span');
+                        blueIcon.className = 'new-video-icon'; // Add class for styling
+                        blueIcon.innerText = '🟡'; // Use a blue circle emoji as the icon
+                        if (!video.metadata.viewed) {
+                            videoItem.appendChild(blueIcon);
+                        }
+
+                        // Append elements to video item
+                        videoItem.appendChild(videoPlayer);
+                        videoItem.appendChild(subject);
+                        videoItem.appendChild(emailDisplay);
+                        
+                        // Add download icon
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = `/videos.files/${videoId}`; // Set the download link to the video source
+                        downloadLink.download = videoId; // Set the download attribute with the video ID
+                        downloadLink.innerHTML = '<i class="fas fa-download"></i>'; // Add Font Awesome download icon
+                        downloadLink.className = 'download-icon'; // Add class for styling
+                        videoItem.appendChild(downloadLink); // Append the download link to the video item
+                        
+                        // Append video item to video card
+                        videoCard.appendChild(videoItem);
+                        videoPlayer.load(); // Load the video player
+
+                        // Add event listener to mark video as viewed when played
+                        videoPlayer.addEventListener('play', () => {
+                            // Remove the blue icon immediately
+                            if (blueIcon.parentNode) {
+                                videoItem.removeChild(blueIcon);
+                            }
+
+                            // Send request to mark video as viewed
+                            fetch('/videos/view', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ id: videoId })
+                            })
+                            .catch(error => {
+                                console.error('Error marking video as viewed:', error);
+                            });
+                        });
+                    });
+
+                    // Search functionality
+                    const searchInput = document.getElementById('searchInput');
+                    searchInput.addEventListener('input', () => {
+                        const searchTerm = searchInput.value.toLowerCase();
+                        const filteredVideos = videos.filter(video => 
+                            video.metadata.userEmail.toLowerCase().includes(searchTerm) || 
+                            video.metadata.subject.toLowerCase().includes(searchTerm)
+                        );
+                        videoCard.innerHTML = ''; // Clear previous videos
+                        filteredVideos.reverse(); // Reverse the order of filtered videos
+                        filteredVideos.forEach(video => {
+                            const videoItem = document.createElement('div');
+                            videoItem.className = 'video-item'; // Add class for styling
+
+                            const videoPlayer = document.createElement('video');
+                            videoPlayer.controls = true;
+                            const videoId = video._id; // Store the video ID for logging
+                            videoPlayer.src = `/videos.files/${videoId}`; // Set the video source
+                            videoPlayer.type = video.metadata.contentType; // Set the content type
+
+                            // Add subject
+                            const subject = document.createElement('h3');
+                            subject.className = 'video-subject';
+                            subject.innerText = video.metadata.subject; // Access subject from metadata
+
+                            // Add email
+                            const emailDisplay = document.createElement('p');
+                            emailDisplay.className = 'video-email';
+                            emailDisplay.innerText = video.metadata.userEmail; // Access email from metadata
+
+                            // Append elements to video item
+                            videoItem.appendChild(videoPlayer);
+                            videoItem.appendChild(subject);
+                            videoItem.appendChild(emailDisplay);
+                            
+                            // Add download icon
+                            const downloadLink = document.createElement('a');
+                            downloadLink.href = `/videos.files/${videoId}`; // Set the download link to the video source
+                            downloadLink.download = videoId; // Set the download attribute with the video ID
+                            downloadLink.innerHTML = '<i class="fas fa-download"></i>'; // Add Font Awesome download icon
+                            downloadLink.className = 'download-icon'; // Add class for styling
+                            videoItem.appendChild(downloadLink); // Append the download link to the video item
+                            
+                            // Append video item to video card
+                            videoCard.appendChild(videoItem);
+                            videoPlayer.load(); // Load the video player
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching videos:', error);
+                    document.getElementById('videoErrorMessage').innerText = 'Failed to load videos.';
+                });
+        });
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
+</create_file>
